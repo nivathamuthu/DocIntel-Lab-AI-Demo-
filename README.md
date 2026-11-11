@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # DocIntel Lab
 
 A document-AI platform for aviation maintenance documents.
@@ -83,3 +84,7 @@ The pipeline is not aviation-specific. The domain lives in the prompts, the enti
 - **Knowledge graph:** entity types become Policy, Insured, Coverage, Exclusion, Claim and Peril, with relations such as COVERS, EXCLUDES and ENDORSES.
 - **Conflict detection:** this finds contradictions such as an endorsement that changes a limit stated in the base wording.
 - **Agent:** the agent can answer "Is this claim covered?" by retrieving the policy, checking the applicable rules, citing clauses and pausing for adjuster approval.
+=======
+# DocIntel-Lab-AI-Demo-
+AI Based AVIATION PROJECT
+>>>>>>> c561e02e504ac1f1c5f4e4a16a4ce599ee82a4b8
