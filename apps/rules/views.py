@@ -18,6 +18,8 @@ from core.embeddings import describe as describe_embeddings
 from core.llm import describe_backend
 from core.models import EvalRun
 
+BULK_MIN_CONFIDENCE = 0.9
+
 STATUS_FILTERS = {
     "open": [Rule.Status.PENDING, Rule.Status.APPROVED],
     **{status: [status] for status in Rule.Status.values},
@@ -69,8 +71,27 @@ def index(request):
         "min_confidence": request.GET.get("min_confidence", ""),
         "prompt_version": settings.RULES_PROMPT_VERSION,
         "latest_eval": EvalRun.objects.filter(kind="rules").first(),
+        "bulk_min": BULK_MIN_CONFIDENCE,
+        "bulk_eligible": Rule.objects.filter(status=Rule.Status.PENDING, confidence__gt=BULK_MIN_CONFIDENCE).count(),
     }
     return render(request, "rules/index.html", context)
+
+
+@require_POST
+def bulk_approve(request):
+    """Approve ticked pending rules, or every pending rule above BULK_MIN_CONFIDENCE."""
+    pending = Rule.objects.filter(status=Rule.Status.PENDING)
+    if request.POST.get("mode") == "threshold":
+        chosen = pending.filter(confidence__gt=BULK_MIN_CONFIDENCE)
+    else:
+        keys = request.POST.getlist("rule")
+        if not keys:
+            messages.error(request, "Tick at least one rule, then click Approve selected.")
+            return redirect("rules:index")
+        chosen = pending.filter(key__in=keys)
+    count = chosen.update(status=Rule.Status.APPROVED, reviewed_at=timezone.now(), merged_into=None)
+    messages.success(request, f"{count} rule{'s' if count != 1 else ''} approved. Only pending rules are changed.")
+    return redirect("rules:index")
 
 
 @require_POST

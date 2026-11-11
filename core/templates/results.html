@@ -1,16 +1,20 @@
 {% extends "base.html" %}
+{% load ui %}
 {% block title %}Results · DocIntel Lab{% endblock %}
-{% block content %}
+{% block page_head %}
 <h1>Results</h1>
-<p class="muted">The latest saved eval for each module. Provider, model and date come from that EvalRun.</p>
+<p class="lead">The latest saved evaluation for each module, with the model that produced it and the date.</p>
+{% endblock %}
+{% block next_step %}Run an evaluation from a module page or with the commands in docs/MODULES.md; the newest run appears here.{% endblock %}
+{% block content %}
 
 {% for section in sections %}
 <h2>{{ section.title }}</h2>
 {% if not section.run %}
-<p class="card muted">No eval yet.</p>
+<div class="empty"><strong>No eval yet.</strong>Run this module's evaluation to fill this section.</div>
 {% else %}
 <p class="card">LLM <strong>{{ section.run.llm_provider }}</strong> / <span class="mono">{{ section.run.llm_model }}</span>
-  · embeddings <strong>{{ section.run.embeddings_provider }}</strong> / <span class="mono">{{ section.run.embeddings_model }}</span>
+  {% if section.run.embeddings_provider %}· embeddings <strong>{{ section.run.embeddings_provider }}</strong> / <span class="mono">{{ section.run.embeddings_model }}</span>{% endif %}
   · {{ section.run.created_at|date:"Y-m-d H:i" }} UTC
   {% if section.run.llm_provider == "mock" %}<br><span class="badge failed">mock</span> This run is the offline stand-in, not a model.{% endif %}</p>
 
@@ -95,6 +99,46 @@
   {% endfor %}
   </tbody>
 </table>
+
+{% elif section.kind == "qa" %}
+<p class="muted">{{ section.run.config.questions }} generated questions that passed the quote and groundedness checks, asked to Search in each mode. Unanswerable questions count as correct only when Search says it does not know. The same model wrote, judged and graded the questions, so it may share blind spots with itself.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Question type</th><th>n</th>{% for mode in section.run.metrics.modes %}<th>{{ mode }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for qtype, row in section.run.metrics.accuracy.items %}
+    <tr><td>{{ qtype }}</td><td class="mono">{{ section.run.metrics.counts|get_item:qtype }}</td>
+      {% for mode in section.run.metrics.modes %}<td class="mono">{{ row|get_item:mode|percent }}</td>{% endfor %}</tr>
+  {% endfor %}
+    <tr><td><strong>all</strong></td><td class="mono">{{ section.run.config.questions }}</td>
+      {% for mode in section.run.metrics.modes %}<td class="mono"><strong>{{ section.run.metrics.overall|get_item:mode|percent }}</strong></td>{% endfor %}</tr>
+  </tbody>
+</table>
+</div>
+<p><strong>Takeaway:</strong> {{ section.run.metrics.takeaway }}</p>
+
+{% elif section.kind == "codegen" %}
+<p class="muted">{{ section.run.metrics.runs }} runs on {{ section.run.metrics.rules }} rules, at most {{ section.run.config.max_attempts }} attempts each. All tests passed in {{ section.run.metrics.passed }}; conflicts surfaced {{ section.run.metrics.conflicts_surfaced }} of {{ section.run.metrics.conflicts_expected }}; mutations caught {{ section.run.metrics.mutations_killed }} of {{ section.run.metrics.mutations_ran }}. Passing tests the model wrote itself shows consistency with its reading of the rule, not that the rule is correct.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Case</th><th>Rules</th><th>Result</th><th>Tests passed</th><th>Attempts</th><th>Conflict surfaced</th><th>Mutation check</th></tr></thead>
+  <tbody>
+  {% for row in section.run.metrics.rows %}
+    <tr>
+      <td class="mono">{{ row.name }}</td>
+      {% if row.status == "skipped" %}<td colspan="6" class="muted">skipped: {{ row.note }}</td>{% else %}
+      <td class="mono small">{{ row.rules|join:", " }}</td>
+      <td><span class="badge {{ row.status }}">{{ row.status }}</span></td>
+      <td class="mono">{{ row.tests_passed }}/{{ row.tests_total }}</td>
+      <td class="mono">{{ row.attempts }}</td>
+      <td>{% if row.conflict_surfaced is None %}n/a{% elif row.conflict_surfaced %}yes{% else %}<strong>no</strong>{% endif %}</td>
+      <td>{% if row.mutation.ran %}{% if row.mutation.killed %}caught{% else %}<strong>missed</strong>{% endif %} <span class="muted small">({{ row.mutation.change }})</span>{% else %}<span class="muted">not run</span>{% endif %}</td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
 {% endif %}
 {% endif %}
 {% endfor %}

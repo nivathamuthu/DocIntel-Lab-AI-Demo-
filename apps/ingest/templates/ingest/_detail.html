@@ -1,15 +1,15 @@
 <div id="detail" {% if document.status == "queued" or document.status == "running" %}hx-get="{% url 'ingest:detail' document.pk %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
-  <h1>{{ document.title }}</h1>
-  <p class="muted">
+  <div class="card">
     <span class="badge {{ document.status }}">{{ document.get_status_display }}</span>
     {{ document.original_name }} · {{ document.file_type|default:"type pending" }}
     · {{ document.page_count|default:"?" }} pages · {{ document.chunk_count }} chunks
-    · <span class="mono">{{ document.sha256 }}</span>
-  </p>
+    <div class="muted mono small">{{ document.sha256 }}</div>
+  </div>
 
   {% if document.current_run %}
-  <h2>Stages <span class="muted">total {{ document.current_run.total_ms }} ms</span></h2>
-  {% if document.current_run.error %}<p class="badge failed">{{ document.current_run.error }}</p>{% endif %}
+  <h2>Stages <span class="muted small">total {{ document.current_run.total_ms }} ms</span></h2>
+  {% include "_error.html" with error=document.current_run.error %}
+  <div class="table-wrap">
   <table>
     <thead>
       <tr><th>Stage</th><th>Status</th><th>Attempts</th><th>Time</th><th>Summary</th></tr>
@@ -22,22 +22,25 @@
         <td>{{ stage.attempts }}</td>
         <td>{% if stage.duration_ms %}{{ stage.duration_ms }} ms{% else %}—{% endif %}</td>
         <td>
-          {% if stage.error %}<span class="badge failed">{{ stage.error }}</span>{% endif %}
+          {% include "_error.html" with error=stage.error %}
           <span class="mono muted">{{ stage.summary }}</span>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% endif %}
 
-  <form method="post" action="{% url 'ingest:reprocess' document.pk %}" style="margin: 12px 0;">
+  <form method="post" action="{% url 'ingest:reprocess' document.pk %}" class="toolbar" style="margin: 12px 0;">
     {% csrf_token %}
-    <button type="submit" {% if document.status == "queued" or document.status == "running" %}disabled{% endif %}>Reprocess</button>
-    <span class="muted">Runs every stage again and replaces the chunks. The file hash stays the same.</span>
+    <button type="submit" class="btn-secondary" data-busy="Queuing…" {% if document.status == "queued" or document.status == "running" %}disabled{% endif %}><span class="spinner" aria-hidden="true"></span><span class="label">Reprocess</span></button>
+    <span class="muted small">Runs every stage again and replaces the chunks. The file hash stays the same.</span>
   </form>
 
   <h2>Chunks</h2>
+  {% if document.chunk_list %}
+  <div class="table-wrap">
   <table>
     <thead>
       <tr><th>#</th><th>Page</th><th>Section</th><th>Tokens</th><th>Text</th></tr>
@@ -54,9 +57,11 @@
           <pre class="chunk">{{ chunk.text }}</pre>
         </td>
       </tr>
-      {% empty %}
-      <tr><td colspan="5" class="muted">Chunks appear here when the index stage finishes.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>No chunks yet.</strong>Chunks appear here when the index stage finishes.</div>
+  {% endif %}
 </div>

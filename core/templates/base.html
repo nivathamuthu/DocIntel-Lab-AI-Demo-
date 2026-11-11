@@ -1,53 +1,55 @@
-{% load django_htmx %}<!doctype html>
+{% load django_htmx static %}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}DocIntel Lab{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=2">
   {% htmx_script %}
-  <style>
-    :root { --fg:#1d2433; --muted:#6b7385; --line:#e3e6ec; --accent:#1f5fbf; --ok:#1b7f3b; --bad:#b42318; --run:#b26b00; }
-    * { box-sizing: border-box; }
-    body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; color:var(--fg); background:#f7f8fa; }
-    header { background:#0f1f3d; color:#fff; padding:10px 24px; display:flex; gap:24px; align-items:center; }
-    header a { color:#cfd8ea; text-decoration:none; } header a.active, header a:hover { color:#fff; }
-    header .brand { font-weight:700; color:#fff; }
-    main { max-width:1200px; margin:24px auto; padding:0 24px; }
-    h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:16px; margin:24px 0 8px; }
-    .muted { color:var(--muted); }
-    .card { background:#fff; border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
-    table { width:100%; border-collapse:collapse; background:#fff; }
-    th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-    th { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
-    code, .mono { font-family:ui-monospace, Consolas, monospace; font-size:12px; }
-    .badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:12px; background:#eef1f6; }
-    .badge.done { background:#e3f4e8; color:var(--ok); } .badge.failed { background:#fde8e6; color:var(--bad); }
-    .badge.running, .badge.retrying { background:#fff2db; color:var(--run); } .badge.pending, .badge.queued { color:var(--muted); }
-    .tag { display:inline-block; margin:1px 2px; padding:0 6px; border-radius:4px; background:#e8effb; color:var(--accent); font-size:11px; }
-    .messages { list-style:none; padding:0; } .messages li { padding:8px 12px; border-radius:6px; background:#e8effb; margin-bottom:6px; }
-    .messages li.warning { background:#fff2db; } .messages li.error { background:#fde8e6; }
-    button, .btn { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px; text-decoration:none; }
-    .bar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:#eef1f6; min-width:120px; }
-    .bar span { display:block; } .bar .done { background:var(--ok); } .bar .running, .bar .retrying { background:var(--run); } .bar .failed { background:var(--bad); }
-    pre.chunk { white-space:pre-wrap; margin:0; font:12px/1.4 ui-monospace, Consolas, monospace; max-height:9em; overflow:auto; }
-  </style>
+  {% block head %}{% endblock %}
 </head>
 <body>
-  <header>
-    <a href="{% url 'home' %}" class="brand">DocIntel Lab</a>
-    <a href="{% url 'home' %}" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a>
-    <a href="{% url 'ingest:index' %}" class="{% if request.resolver_match.namespace == 'ingest' %}active{% endif %}">1 · Ingest</a>
-    <a href="{% url 'prompts:compare' %}" class="{% if request.resolver_match.namespace == 'prompts' %}active{% endif %}">2 · Prompts</a>
-    <a href="{% url 'rag:query' %}" class="{% if request.resolver_match.namespace == 'rag' %}active{% endif %}">3 · RAG</a>
-    <a href="{% url 'kg:index' %}" class="{% if request.resolver_match.namespace == 'kg' %}active{% endif %}">4 · Graph</a>
-    <a href="{% url 'rules:index' %}" class="{% if request.resolver_match.namespace == 'rules' %}active{% endif %}">5 · Rules</a>
-    <a href="{% url 'agents:index' %}" class="{% if request.resolver_match.namespace == 'agents' %}active{% endif %}">8 · Agent</a>
-    <a href="{% url 'results' %}" class="{% if request.resolver_match.url_name == 'results' %}active{% endif %}">Results</a>
-    <a href="{% url 'admin:index' %}">Admin</a>
-  </header>
+  {% with ns=request.resolver_match.namespace url_name=request.resolver_match.url_name %}
+  <nav class="topnav" aria-label="Modules">
+    <div class="inner">
+      <a href="{% url 'home' %}" class="brand">DocIntel Lab</a>
+      <a class="nav-link {% if ns == 'ingest' %}active{% endif %}" href="{% url 'ingest:index' %}" {% if ns == 'ingest' %}aria-current="page"{% endif %}><span class="n">1</span>Ingest</a>
+      <a class="nav-link {% if ns == 'prompts' %}active{% endif %}" href="{% url 'prompts:compare' %}" {% if ns == 'prompts' %}aria-current="page"{% endif %}><span class="n">2</span>Prompts</a>
+      <a class="nav-link {% if ns == 'rag' %}active{% endif %}" href="{% url 'rag:query' %}" {% if ns == 'rag' %}aria-current="page"{% endif %}><span class="n">3</span>Search</a>
+      <a class="nav-link {% if ns == 'kg' %}active{% endif %}" href="{% url 'kg:index' %}" {% if ns == 'kg' %}aria-current="page"{% endif %}><span class="n">4</span>Graph</a>
+      <a class="nav-link {% if ns == 'rules' %}active{% endif %}" href="{% url 'rules:index' %}" {% if ns == 'rules' %}aria-current="page"{% endif %}><span class="n">5</span>Rules</a>
+      <a class="nav-link {% if ns == 'qa' %}active{% endif %}" href="{% url 'qa:index' %}" {% if ns == 'qa' %}aria-current="page"{% endif %}><span class="n">6</span>Q&amp;A</a>
+      <a class="nav-link {% if ns == 'codegen' %}active{% endif %}" href="{% url 'codegen:index' %}" {% if ns == 'codegen' %}aria-current="page"{% endif %}><span class="n">7</span>Code</a>
+      <a class="nav-link {% if ns == 'agents' %}active{% endif %}" href="{% url 'agents:index' %}" {% if ns == 'agents' %}aria-current="page"{% endif %}><span class="n">8</span>Agent</a>
+      <a class="nav-link {% if url_name == 'results' %}active{% endif %}" href="{% url 'results' %}" {% if url_name == 'results' %}aria-current="page"{% endif %}>Results</a>
+    </div>
+  </nav>
+  {% endwith %}
   <main>
-    {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+    <header class="page-head">{% block page_head %}{% endblock %}</header>
+    {% block next_step_box %}<aside class="next-step" aria-label="Next step"><strong>Next step:</strong> <span>{% block next_step %}Pick a module in the menu above.{% endblock %}</span></aside>{% endblock %}
+    {% if messages %}<ul class="messages" role="status">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="site-footer">
+    <div class="inner">
+      <span>Demo build, no authentication.</span>
+      <span><a href="{% url 'home' %}">Home</a> · <a href="{% url 'admin:index' %}">Admin</a></span>
+    </div>
+  </footer>
+  <script>
+    // Buttons with data-busy show a spinner and their busy label while the form submits.
+    document.addEventListener("submit", function (event) {
+      var button = event.submitter;
+      if (!button || !button.dataset.busy) { return; }
+      button.classList.add("is-loading");
+      var label = button.querySelector(".label");
+      if (label) { label.textContent = button.dataset.busy; }
+      setTimeout(function () { button.disabled = true; }, 0);
+    });
+    document.body.addEventListener("htmx:configRequest", function (event) {
+      event.detail.headers["X-CSRFToken"] = "{{ csrf_token }}";
+    });
+  </script>
 </body>
 </html>

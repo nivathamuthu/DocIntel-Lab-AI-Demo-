@@ -1,0 +1,90 @@
+{% load codegen_display ui %}
+<div id="run-body" {% if run.active %}hx-get="{% url 'codegen:run_body' run.id %}?poll=1" hx-trigger="every 1500ms" hx-swap="outerHTML"{% endif %}>
+<p class="card small">LLM <strong>{{ run.llm_provider }}</strong> / <span class="mono">{{ run.llm_model }}</span>
+  · status <span class="badge {{ run.status }}">{{ run.get_status_display }}</span>
+  · attempts {{ run.attempts_used }} of {{ run.max_attempts }}
+  {% if run.unreviewed %}· <span class="badge unreviewed">includes unreviewed rules</span>{% endif %}
+  {% if run.added_keys %}· added as conflict partners: <span class="mono">{{ run.added_keys|join:", " }}</span>{% endif %}</p>
+
+{% if run.conflicts %}
+<div class="card warn">
+  <strong>These rules disagree.</strong> The generated code returns 'conflict' and does not choose.
+  <ul class="small">{% for c in run.conflicts %}<li><span class="mono">{{ c.a }}</span> vs <span class="mono">{{ c.b }}</span>: {{ c.reason }}</li>{% endfor %}</ul>
+  {% if run.conflict_surfaced is not None %}<p class="small">Conflict surfaced by the final code: {% if run.conflict_surfaced %}<span class="badge ok">yes</span>{% else %}<span class="badge bad">no</span>{% endif %}</p>{% endif %}
+</div>
+{% endif %}
+
+{% if run.active %}
+<div class="card"><span class="spinner htmx-request" aria-hidden="true" style="display:inline-block"></span>
+  {% if not run.function_name %}Writing the code…{% elif not attempts %}Writing the tests from the rule text…{% else %}Attempt {{ attempts|length }} finished; repairing and running again…{% endif %}</div>
+{% endif %}
+
+{% if run.status == "failed" %}{% include "_error.html" with error=run.error %}{% endif %}
+
+<h2>Attempts</h2>
+{% if attempts %}
+<ol class="timeline">
+  {% for attempt in attempts %}
+  <li class="{{ attempt.status }}">
+    <details class="card" {% if forloop.last and run.status != "passed" %}open{% endif %}>
+      <summary>Attempt {{ attempt.number }} <span class="badge {{ attempt.status }}">{{ attempt.get_status_display }}</span>
+        <span class="muted small">· {{ attempt.passed_count }} passed, {{ attempt.failed_count }} failed · {{ attempt.duration_ms }} ms</span></summary>
+      {% if attempt.verdicts %}<div class="card warn small" style="margin-top:10px"><strong>Who is at fault, judged against the rule text</strong>
+        <ul>{% for v in attempt.verdicts %}<li><span class="mono">{{ v.test }}</span> <span class="badge {% if v.fault == 'code' %}info{% elif v.fault == 'test' %}warn{% else %}bad{% endif %}">{% if v.fault == 'code' %}code at fault{% elif v.fault == 'test' %}test at fault: dropped, code kept{% else %}rule ambiguous{% endif %}</span> {{ v.reason }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if attempt.blocked %}<div class="error-box">The static check refused this code before running it:<ul>{% for b in attempt.blocked %}<li>{{ b }}</li>{% endfor %}</ul></div>{% endif %}
+      <div class="grid-2" style="margin-top:10px">
+        <div><h3>Code</h3><pre class="code">{{ attempt.code|python_html }}</pre></div>
+        <div><h3>Tests</h3><pre class="code">{{ attempt.tests|python_html }}</pre></div>
+      </div>
+      <h3>pytest output</h3>
+      <pre class="code output">{{ attempt.pytest_output|pytest_html }}</pre>
+    </details>
+  </li>
+  {% endfor %}
+</ol>
+{% elif not run.active %}
+<div class="empty"><strong>No attempt ran.</strong>The run stopped before the tests could run. Start a new run from the Code page.</div>
+{% endif %}
+
+{% if run.final_code %}
+<h2>Result</h2>
+{% if run.status == "passed" %}
+<div class="card ok"><strong>All tests passed</strong> on attempt {{ run.attempts_used }} of {{ run.max_attempts }}. This shows the code agrees with the model's reading of the rules, not that the rules are correct.</div>
+{% else %}
+<div class="card warn"><strong>Needs review.</strong> {{ run.review_reason|default:"The tests do not all pass." }} Compare the failing test with the rule text before using this code.</div>
+{% endif %}
+{% if run.mutation %}<p class="small">Mutation check: {% if run.mutation.ran %}<span class="badge {% if run.mutation.killed %}ok{% else %}bad{% endif %}">{% if run.mutation.killed %}caught{% else %}missed{% endif %}</span> {% endif %}{{ run.mutation.note }}</p>{% endif %}
+<div class="grid-2">
+  <div>
+    <div class="code-head"><h3>{{ code_module }}.py</h3>
+      <span class="toolbar">
+        <button type="button" class="btn-secondary btn-sm" onclick="copyCode('final-code', this)"><span class="label">Copy</span></button>
+        <a class="btn btn-secondary btn-sm" href="{% url 'codegen:download' run.id code_module|add:'.py' %}">Download</a>
+      </span></div>
+    <pre class="code" id="final-code">{{ run.final_code|python_html }}</pre>
+  </div>
+  <div>
+    <div class="code-head"><h3>{{ test_module }}.py</h3>
+      <span class="toolbar">
+        <button type="button" class="btn-secondary btn-sm" onclick="copyCode('final-tests', this)"><span class="label">Copy</span></button>
+        <a class="btn btn-secondary btn-sm" href="{% url 'codegen:download' run.id test_module|add:'.py' %}">Download</a>
+      </span></div>
+    <pre class="code" id="final-tests">{{ run.final_tests|python_html }}</pre>
+  </div>
+</div>
+<p class="small muted">The code imports <a href="{% url 'codegen:download' run.id 'decision.py' %}">decision.py</a>, the fixed Decision type every run shares. Put the three files in one folder and run <span class="mono">pytest</span>.</p>
+{% endif %}
+
+{% if run.case_problems %}
+<details class="card"><summary>{{ run.case_problems|length }} test case{{ run.case_problems|length|pluralize }} dropped (invalid, or contradicting the rule text)</summary>
+  <ul class="small">{% for p in run.case_problems %}<li>{{ p }}</li>{% endfor %}</ul></details>
+{% endif %}
+
+<details class="card"><summary>Rules in this run</summary>
+  <ul class="small">{% for rule in run.rules %}
+    <li><strong class="mono">{{ rule.key }}</strong> <span class="badge {{ rule.label }}">{{ rule.label }}</span> {{ rule.citation }}<br>
+      <strong>If</strong> {{ rule.condition }} <strong>then</strong> {{ rule.action }}{% if rule.exception %} <strong>unless</strong> {{ rule.exception }}{% endif %}<br>
+      <span class="muted">"{{ rule.quote }}"</span></li>
+  {% endfor %}</ul>
+</details>
+</div>

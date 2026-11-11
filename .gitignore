@@ -9,7 +9,9 @@ __pycache__/
 .coverage
 htmlcov/
 data/media/
+# Raw per-run eval output stays local; the curated evals/REPORT.md is tracked.
 evals/results/*.md
+!evals/REPORT.md
 data/corpus/public/
 data/corpus/synthetic/*.pdf
 data/corpus/synthetic/*.docx

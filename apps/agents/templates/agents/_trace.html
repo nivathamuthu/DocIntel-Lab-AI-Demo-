@@ -1,12 +1,13 @@
 <div id="trace" {% if run.active %}hx-get="{% url 'agents:trace' run.id %}?poll=1" hx-trigger="every 1500ms" hx-swap="outerHTML"{% endif %}>
   <p class="muted">
-    <span class="badge {% if run.status == 'done' %}done{% elif run.status == 'failed' or run.status == 'rejected' %}failed{% elif run.active or run.status == 'awaiting_approval' %}running{% endif %}">{{ run.get_status_display }}</span>
+    <span class="badge {% if run.status == 'done' %}done{% elif run.status == 'failed' or run.status == 'rejected' %}failed{% elif run.status == 'refused' %}info{% elif run.active or run.status == 'awaiting_approval' %}running{% endif %}">{{ run.get_status_display }}</span>
     · intent <span class="mono">{{ run.intent|default:"-" }}</span>
     · loops {{ run.loops }} / {{ max_loops }}
     · citations verified {% if run.verified is None %}-{% elif run.verified %}yes{% else %}<strong>no</strong>{% endif %}
     · {{ steps|length }} steps
     {% if run.active %}· <em>running, refreshing every 1.5 s</em>{% endif %}
   </p>
+  <div class="table-wrap">
   <table>
     <thead><tr><th>#</th><th>Node</th><th>Loop</th><th>Status</th><th>ms</th><th>Tool calls</th><th>LLM calls</th><th>Input / output</th></tr></thead>
     <tbody>
@@ -26,7 +27,7 @@
           <div class="mono">{{ call.schema }} · {{ call.attempts }} attempt{{ call.attempts|pluralize }} · {{ call.latency_ms }} ms · {{ call.tokens }} tok</div>
           {% empty %}<span class="muted">-</span>{% endfor %}</td>
         <td>
-          {% if step.error %}<div class="badge failed">{{ step.error }}</div>{% endif %}
+          {% include "_error.html" with error=step.error %}
           {% if step.output.notes %}<div class="muted">{% for key, value in step.output.notes.items %}{{ key }}: {{ value }}<br>{% endfor %}</div>{% endif %}
           <details><summary class="muted">input</summary><pre class="chunk">{{ step.input_json }}</pre></details>
           <details><summary class="muted">output</summary><pre class="chunk">{{ step.output_json }}</pre></details>
@@ -37,4 +38,5 @@
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>

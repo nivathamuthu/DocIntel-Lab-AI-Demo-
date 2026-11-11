@@ -33,7 +33,7 @@ def run_eval(k: int = 5) -> EvalRun:
     llm = describe_backend()
     embeddings = describe_embeddings()
     report = _report(questions, scores, llm, embeddings, k)
-    results_dir = Path(settings.BASE_DIR) / "evals" / "results"
+    results_dir = Path(settings.EVAL_RESULTS_DIR)
     results_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     (results_dir / f"rag_{stamp}.md").write_text(report, encoding="utf-8")

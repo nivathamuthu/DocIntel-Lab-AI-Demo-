@@ -18,6 +18,7 @@ def _runtime(settings, tmp_path):
     media = tmp_path / "media"
     media.mkdir()
     settings.MEDIA_ROOT = media
+    settings.EVAL_RESULTS_DIR = tmp_path / "eval_results"
     from django.core.files.storage import storages
 
     storages._storages.pop("default", None)

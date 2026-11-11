@@ -101,7 +101,7 @@ def run_eval(versions: tuple[str, ...] = ("v1", "v2"), force: bool = False) -> E
         for version, result in results.items()
     }
     report = _report(gold, results, llm, embeddings, missing)
-    results_dir = Path(settings.BASE_DIR) / "evals" / "results"
+    results_dir = Path(settings.EVAL_RESULTS_DIR)
     results_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     (results_dir / f"rules_{stamp}.md").write_text(report, encoding="utf-8")

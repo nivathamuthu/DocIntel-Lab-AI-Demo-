@@ -1,0 +1,17 @@
+{% load ui %}<div id="qa-progress-{{ run.kind }}" class="card {% if run.status == 'failed' %}bad{% elif run.status == 'done' %}ok{% endif %}" {% if run.active %}hx-get="{% url 'qa:progress' run.id %}?poll=1" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %} aria-live="polite">
+  <div class="toolbar spread">
+    <strong>{% if run.kind == "generate" %}Q&amp;A generation{% else %}Search evaluation{% endif %}</strong>
+    <span class="badge {{ run.status }}">{{ run.get_status_display }}</span>
+  </div>
+  <div class="progress" role="progressbar" aria-label="Progress" aria-valuenow="{{ run.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ run.percent }}%"></span></div>
+  <p class="muted small" style="margin:0">
+    {% if run.active %}<span class="spinner htmx-request" aria-hidden="true" style="display:inline-block"></span>{% endif %}
+    {{ run.message }}{% if run.total %} · step {{ run.done }} of {{ run.total }}{% endif %}
+    · started {{ run.created_at|date:"H:i:s" }}{% if run.finished_at %}, finished {{ run.finished_at|date:"H:i:s" }}{% endif %}
+    · {{ run.llm_provider }} / {{ run.llm_model }}
+  </p>
+  {% if run.status == "done" and run.kind == "generate" %}
+  <p class="small" style="margin:6px 0 0">{{ run.stats.ran }} sent to the model, {{ run.stats.cached }} reused from the cache{% if run.stats.failed %}, <strong>{{ run.stats.failed }} failed validation</strong>{% endif %} · {{ run.stats.chunks }} chunks, {{ run.stats.linked_pairs }} graph-linked chunk pairs.</p>
+  {% endif %}
+  {% include "_error.html" with error=run.error %}
+</div>

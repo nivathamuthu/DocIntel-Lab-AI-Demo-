@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Code · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Rules to code</h1>
+<p class="lead">Turn reviewed rules into a plain Python function and a pytest file, then run the tests and let the model repair its code up to {{ max_attempts }} times.</p>
+{% endblock %}
+{% block next_step %}{% if items %}Tick one or more rules, then click <strong>Generate code</strong>. A run takes under a minute with a real model.{% else %}Extract and review rules on the <a href="{% url 'rules:index' %}">Rules</a> page first.{% endif %}{% endblock %}
+{% block content %}
+{% if llm.provider == "mock" %}
+<ul class="messages"><li class="warning">LLM_PROVIDER=mock. The code and tests come from the offline stand-in, not a model. Set a real provider in .env for real results.</li></ul>
+{% endif %}
+<div class="grid-2">
+  <div class="card">
+    <h3>How it works</h3>
+    <p>One model call writes the function. A separate call writes test cases from the rule text: condition, action and exception. <strong>The tests come from the rule text, not from the code, so the code cannot cheat.</strong> If tests fail, the model sees the pytest output and repairs the code; the tests never change.</p>
+    <p class="muted small">Passing tests show the code agrees with the model's own reading of the rule, not that the rule or that reading is correct. When a test fails, a separate call judges it against the rule text: a wrong test is dropped and the code kept, an ambiguous rule stops the run for review, and a repair may not change a number from the rule text. A person still reviews the result.</p>
+  </div>
+  <div class="card warn">
+    <h3>Demo sandbox, not a security boundary</h3>
+    <p class="small">Tests run with pytest in a separate <span class="mono">python -I</span> process, in a temporary folder, with no secrets in its environment, sockets disabled and a {{ timeout }}-second timeout. Imports such as os, subprocess, socket, requests and shutil are refused before anything runs. Determined code could still get around this, so do not run untrusted rules outside a demo.</p>
+    <p class="small muted">LLM <strong>{{ llm.provider }}</strong> / <span class="mono">{{ llm.model }}</span></p>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat ok"><div class="value">{{ approved_count }}</div><div class="label">rules approved</div></div>
+  <div class="stat warn"><div class="value">{{ unreviewed_count }}</div><div class="label">rules unreviewed (pending)</div></div>
+  <div class="stat warn"><div class="value">{{ unreviewed_runs }}</div><div class="label">runs that used unreviewed rules</div></div>
+</div>
+{% if unreviewed_shown %}
+<div class="card warn"><strong>Unreviewed rules.</strong> {{ unreviewed_shown }} of the rules below {{ unreviewed_shown|pluralize:"has,have" }} not been approved by a person. Code generated from them is labelled "unreviewed" and may encode a rule that is wrong. <a href="{% url 'rules:index' %}">Review rules first</a>.</div>
+{% endif %}
+
+{% if items %}
+<form method="post" action="{% url 'codegen:start' %}" id="codegen-form">
+  {% csrf_token %}
+  <h2>Step 1 · Choose rules</h2>
+  <div class="card">
+    <div class="toolbar spread" style="margin-bottom:10px">
+      <input type="search" id="rule-search" class="wide" placeholder="Search rules by key, document or text" aria-label="Search rules">
+      {% if approved_exists %}
+        {% if show_unreviewed %}<a href="{% url 'codegen:index' %}">Show approved rules only</a>
+        {% else %}<a href="?unreviewed=1">Show unreviewed rules too</a>{% endif %}
+      {% else %}
+        <span class="badge unreviewed" style="white-space:normal">No rule is approved yet: showing pending rules as unreviewed</span>
+      {% endif %}
+    </div>
+    <ul class="checklist" id="rule-list">
+      {% for item in items %}
+      <li data-text="{{ item.rule.key }} {{ item.rule.document.title }} {{ item.rule.condition }} {{ item.rule.action }}" data-partners="{{ item.partners|join:',' }}">
+        <input type="checkbox" name="rule" value="{{ item.rule.key }}" id="rule-{{ item.rule.key }}">
+        <label for="rule-{{ item.rule.key }}" style="flex:1">
+          <strong class="mono">{{ item.rule.key }}</strong>
+          <span class="badge {{ item.label }}">{{ item.label }}</span>
+          {% if item.partners %}<span class="badge conflict">conflict with {{ item.partners|join:", " }}</span>{% endif %}
+          <span class="muted small">· {{ item.rule.citation }}</span><br>
+          <span class="small"><strong>If</strong> {{ item.rule.condition }} <strong>then</strong> {{ item.rule.action }}{% if item.rule.exception %} <strong>unless</strong> {{ item.rule.exception }}{% endif %}</span>
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="muted small" id="rule-count" style="margin-top:8px"></p>
+  </div>
+
+  <div class="card warn" id="conflict-card" hidden>
+    <strong>These rules disagree.</strong> The generated code returns 'conflict' and does not choose.
+    <span class="muted small">Rules in conflict with a ticked rule are added to the run automatically.</span>
+  </div>
+
+  <h2>Step 2 · Generate</h2>
+  <div class="card toolbar">
+    <button type="submit" class="btn-lg" data-busy="Generating…"><span class="spinner" aria-hidden="true"></span><span class="label">Generate code</span></button>
+    <span class="muted small">Writes the code, writes the tests, runs them, and repairs up to {{ max_attempts }} attempts in total.</span>
+  </div>
+</form>
+<script>
+(function () {
+  var list = document.getElementById("rule-list");
+  var search = document.getElementById("rule-search");
+  var count = document.getElementById("rule-count");
+  var card = document.getElementById("conflict-card");
+  function update() {
+    var term = search.value.trim().toLowerCase(), shown = 0, ticked = 0, conflict = false;
+    list.querySelectorAll("li").forEach(function (li) {
+      var match = !term || li.getAttribute("data-text").toLowerCase().indexOf(term) >= 0;
+      li.hidden = !match;
+      if (match) shown++;
+      if (li.querySelector("input").checked) {
+        ticked++;
+        if (li.getAttribute("data-partners")) conflict = true;
+      }
+    });
+    count.textContent = shown + " shown, " + ticked + " ticked";
+    card.hidden = !conflict;
+  }
+  search.addEventListener("input", update);
+  list.addEventListener("change", update);
+  update();
+})();
+</script>
+{% else %}
+<div class="empty"><strong>No rules to turn into code.</strong>Run rule extraction on the <a href="{% url 'rules:index' %}">Rules</a> page, then come back.</div>
+{% endif %}
+
+<h2>Step 3 · Runs</h2>
+{% if runs %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Run</th><th>Rules</th><th>Status</th><th>Attempts</th><th>Conflict surfaced</th><th>Model</th><th>Started</th></tr></thead>
+  <tbody>
+  {% for run in runs %}
+    <tr>
+      <td><a href="{% url 'codegen:run' run.id %}">#{{ run.id }}{% if run.function_name %} · <span class="mono">{{ run.function_name }}</span>{% endif %}</a></td>
+      <td class="mono small">{{ run.rule_keys|join:", " }}{% if run.unreviewed %} <span class="badge unreviewed">unreviewed</span>{% endif %}</td>
+      <td><span class="badge {{ run.status }}">{{ run.get_status_display }}</span></td>
+      <td>{{ run.attempts_used }} of {{ run.max_attempts }}</td>
+      <td>{% if run.conflict_surfaced is None %}<span class="muted">no conflict</span>{% elif run.conflict_surfaced %}<span class="badge ok">yes</span>{% else %}<span class="badge bad">no</span>{% endif %}</td>
+      <td class="small">{{ run.llm_provider }} / <span class="mono">{{ run.llm_model }}</span></td>
+      <td class="small">{{ run.created_at|date:"Y-m-d H:i" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty"><strong>No runs yet.</strong>Tick a rule above and click Generate code.</div>
+{% endif %}
+{% endblock %}

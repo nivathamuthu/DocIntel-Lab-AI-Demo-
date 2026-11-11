@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Q&amp;A · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Q&amp;A generation</h1>
+<p class="lead">Write question and answer pairs from the documents, keep only the ones whose quote is really in the text and that a judge finds grounded, review them, then use them to test Search.</p>
+{% endblock %}
+{% block next_step %}{% if not counts.generated %}Click <strong>Generate Q&amp;A</strong>. It reads every chunk and takes a few minutes with a real model.{% elif not latest_eval %}Click a row to read its source and approve or reject it, then click <strong>Run evaluation</strong>.{% else %}Read the takeaway under the evaluation table, then export the approved pairs.{% endif %}{% endblock %}
+{% block content %}
+{% if llm.provider == "mock" %}
+<ul class="messages"><li class="warning">LLM_PROVIDER=mock. Questions, judgments and grades come from the offline stand-in, not a model. Set a real provider in .env for real results.</li></ul>
+{% endif %}
+<p class="card small">LLM <strong>{{ llm.provider }}</strong> / <span class="mono">{{ llm.model }}</span>
+  · embeddings <strong>{{ embeddings.provider }}</strong> / <span class="mono">{{ embeddings.model }}</span>
+  · prompts <span class="mono">generate_qa/{{ prompt_version }}</span>, <span class="mono">judge_groundedness/{{ judge_version }}</span>
+  · keep at groundedness ≥ {{ min_groundedness }}</p>
+
+<div class="stats">
+  <div class="stat"><div class="value">{{ counts.generated }}</div><div class="label">generated</div></div>
+  <div class="stat ok"><div class="value">{{ counts.kept }}</div><div class="label">kept</div></div>
+  <div class="stat bad"><div class="value">{{ counts.dropped_quote }}</div><div class="label">dropped (quote not found)</div></div>
+  <div class="stat bad"><div class="value">{{ counts.dropped_grounded }}</div><div class="label">dropped (low groundedness)</div></div>
+  <div class="stat ok"><div class="value">{{ counts.approved }}</div><div class="label">approved by a human</div></div>
+  <div class="stat warn"><div class="value">{{ counts.unreviewed }}</div><div class="label">kept, not reviewed yet</div></div>
+</div>
+
+<div class="card">
+  <form method="post" action="{% url 'qa:generate' %}" class="toolbar">
+    {% csrf_token %}
+    <button type="submit" class="btn-lg" data-busy="Starting…" {% if generate_run.active %}disabled{% endif %}><span class="spinner" aria-hidden="true"></span><span class="label">Generate Q&amp;A</span></button>
+    <label class="muted small"><input type="checkbox" name="force" value="1"> regenerate cached chunks (clears their reviews)</label>
+  </form>
+  <p class="muted small" style="margin-top:8px">Per chunk: two factual questions and one unanswerable question. Per pair of chunks that the knowledge graph links: one multi-hop question. Unchanged chunks are reused from the cache.</p>
+</div>
+{% if generate_run %}{% include "qa_gen/_progress.html" with run=generate_run %}{% endif %}
+
+<h2>Pairs</h2>
+<form class="card filters" method="get">
+  <label>Type
+    <select name="type" onchange="this.form.submit()">
+      <option value="all">all types</option>
+      {% for value, label in types %}<option value="{{ value }}" {% if value == qtype %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Status
+    <select name="status" onchange="this.form.submit()">
+      {% for value in statuses %}<option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ value }}</option>{% endfor %}
+    </select>
+  </label>
+  <noscript><button type="submit" class="btn-secondary">Filter</button></noscript>
+  <span class="muted small">{{ pairs|length }} shown</span>
+</form>
+
+{% if pairs %}
+<div class="grid-main-side">
+  <form method="post" action="{% url 'qa:bulk_approve' %}">
+  {% csrf_token %}
+  <div class="card toolbar">
+    <button type="submit" name="mode" value="selected" class="btn-secondary" onclick="return confirm('Approve the ticked pairs? Approval should be your own judgement after reading each answer against its source.')">Approve selected</button>
+    <button type="submit" name="mode" value="threshold" class="btn-secondary" {% if not bulk_eligible %}disabled{% endif %} onclick="return confirm('Approve all {{ bulk_eligible }} kept pairs above {{ bulk_min }} groundedness? Groundedness is the model\'s own score, not a review.')">Approve all {{ bulk_eligible }} kept pairs above {{ bulk_min }} groundedness</button>
+    <span class="muted small">Approval should be a human judgement: read the answer against its source first. Only kept, unreviewed pairs change.</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><span class="sr-only">Select</span></th><th>Question</th><th>Type</th><th>Groundedness</th><th>Status</th><th>Source</th></tr></thead>
+      <tbody>
+      {% for pair in pairs %}
+        <tr class="clickable" tabindex="0" hx-get="{% url 'qa:panel' pair.id %}" hx-target="#qa-panel" hx-trigger="click, keyup[key=='Enter']"
+            onclick="document.querySelectorAll('tr.selected').forEach(function(r){r.classList.remove('selected')}); this.classList.add('selected');">
+          <td>{% if pair.verdict == "kept" and pair.review == "pending" %}<input type="checkbox" name="pair" value="{{ pair.id }}" aria-label="Select pair {{ pair.id }}" onclick="event.stopPropagation()" onkeyup="event.stopPropagation()">{% endif %}</td>
+          <td>{{ pair.question }}</td>
+          <td><span class="badge info">{{ pair.get_qtype_display }}</span></td>
+          <td>{% include "qa_gen/_meter.html" with score=pair.groundedness %}</td>
+          <td><span id="qa-status-{{ pair.id }}" class="badge {{ pair.status }}">{{ pair.status_label }}</span></td>
+          <td>{% for chunk in pair.chunks.all %}<span class="tag">{{ chunk.document.title }}{% if chunk.page_start %}, p.{{ chunk.page_start }}{% endif %}</span>{% endfor %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  </form>
+  <aside id="qa-panel" class="card sticky" aria-live="polite" style="max-height:80vh; overflow:auto">
+    <p class="panel-empty">Click a row to see the answer, the source with the quote highlighted, the judge's reason, and Approve / Reject.</p>
+  </aside>
+</div>
+{% elif counts.generated %}
+<div class="empty"><strong>No pairs match these filters.</strong>Choose "all types" and "all" to see every pair.</div>
+{% else %}
+<div class="empty"><strong>No Q&amp;A yet.</strong>Click Generate Q&amp;A.</div>
+{% endif %}
+
+<h2>Evaluate Search with the kept pairs</h2>
+<div class="card">
+  <form method="post" action="{% url 'qa:evaluate' %}" class="toolbar">
+    {% csrf_token %}
+    <button type="submit" data-busy="Starting…" {% if evaluate_run.active or not counts.kept %}disabled{% endif %}><span class="spinner" aria-hidden="true"></span><span class="label">Run evaluation</span></button>
+    <span class="muted small">Up to {{ per_type }} kept pairs per type (approved first), asked with {{ eval_modes|join:", " }}. An unanswerable question counts as correct only when Search says it does not know; other answers are graded by the model against the reference answer.</span>
+  </form>
+</div>
+{% if evaluate_run %}{% include "qa_gen/_progress.html" with run=evaluate_run %}{% endif %}
+
+{% if latest_eval %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Question type</th><th>n</th>{% for mode in latest_eval.metrics.modes %}<th>{{ mode }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for qtype, row in latest_eval.metrics.accuracy.items %}
+    <tr><td>{{ qtype }}</td><td class="mono">{{ latest_eval.metrics.counts|get_item:qtype }}</td>
+      {% for mode in latest_eval.metrics.modes %}<td class="mono">{{ row|get_item:mode|percent }}</td>{% endfor %}</tr>
+  {% endfor %}
+    <tr><td><strong>all</strong></td><td class="mono">{{ latest_eval.config.questions }}</td>
+      {% for mode in latest_eval.metrics.modes %}<td class="mono"><strong>{{ latest_eval.metrics.overall|get_item:mode|percent }}</strong></td>{% endfor %}</tr>
+  </tbody>
+</table>
+</div>
+<p class="card ok"><strong>Takeaway:</strong> {{ latest_eval.metrics.takeaway }}</p>
+<p class="muted small">Evaluated {{ latest_eval.created_at }} with {{ latest_eval.llm_provider }} / {{ latest_eval.llm_model }}. The same model wrote the questions, judged them and graded the answers, so it may share blind spots with itself. Small sample.</p>
+<details class="card">
+  <summary>Per-question results</summary>
+  <div class="table-wrap" style="margin-top:10px">
+  <table>
+    <thead><tr><th>Question</th><th>Type</th>{% for mode in latest_eval.metrics.modes %}<th>{{ mode }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for row in latest_eval.metrics.rows %}
+      <tr><td>{{ row.question }}<div class="muted small">Reference: {{ row.reference }}</div></td><td>{{ row.qtype }}</td>
+        {% for mode in latest_eval.metrics.modes %}{% with result=row.results|get_item:mode %}
+        <td><span class="badge {% if result.correct %}ok{% else %}bad{% endif %}">{% if result.correct %}correct{% else %}wrong{% endif %}</span><div class="small muted">{{ result.reason }}</div></td>
+        {% endwith %}{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</details>
+{% elif counts.kept %}
+<div class="empty"><strong>No evaluation yet.</strong>Click Run evaluation to ask Search every kept question.</div>
+{% endif %}
+
+<h2>Export</h2>
+<div class="card toolbar">
+  <a class="btn btn-secondary" href="{% url 'qa:export' 'json' %}">Export approved · JSON</a>
+  <a class="btn btn-secondary" href="{% url 'qa:export' 'csv' %}">Export approved · CSV</a>
+  <span class="muted small">{{ counts.approved }} approved pair{{ counts.approved|pluralize }}.</span>
+</div>
+{% endblock %}

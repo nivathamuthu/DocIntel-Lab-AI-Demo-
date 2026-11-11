@@ -1,54 +1,59 @@
 {% extends "base.html" %}
-{% block title %}Knowledge graph · DocIntel Lab{% endblock %}
+{% block title %}Graph · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Knowledge graph</h1>
+<p class="lead">Parts, directives, tasks and intervals found in the chunks, linked by how the text relates them. Every node and edge keeps the chunk, document and page it came from.</p>
+{% endblock %}
+{% block next_step %}{% if build %}Click a node to see its sources, or ask a two-step question under GraphRAG to compare it with plain search.{% else %}Build the graph with <span class="mono">python manage.py build_graph --extract</span>, or upload a document.{% endif %}{% endblock %}
 {% block content %}
-<h1>4 · Knowledge graph</h1>
-<p class="muted">Entities and relations are extracted per chunk, merged by normalized name and alias, and stored with the chunk, document and page they came from. Click a node to see its sources.</p>
-
 {% if build %}
-<div class="card">
-  <strong>{{ build.node_count }}</strong> nodes ·
-  <strong>{{ build.edge_count }}</strong> edges ·
-  <strong>{{ build.merged_count }}</strong> merged duplicates ·
-  <strong>{{ build.dropped_count }}</strong> dropped relations
-  <div class="muted">Backend {{ build.backend }} · extraction prompt {{ build.prompt_version }} · {{ build.chunk_count }} chunks · built {{ build.created_at }}</div>
+<div class="stats">
+  <div class="stat"><div class="value">{{ build.node_count }}</div><div class="label">nodes</div></div>
+  <div class="stat"><div class="value">{{ build.edge_count }}</div><div class="label">edges</div></div>
+  <div class="stat"><div class="value">{{ build.merged_count }}</div><div class="label">merged duplicates</div></div>
+  <div class="stat"><div class="value">{{ build.dropped_count }}</div><div class="label">dropped relations</div></div>
 </div>
+<p class="muted small">Backend {{ build.backend }} · extraction prompt {{ build.prompt_version }} · {{ build.chunk_count }} chunks · built {{ build.created_at }}</p>
 {% else %}
-<p class="card">No graph yet. Run <span class="mono">python manage.py build_graph --extract</span>, or upload a document.</p>
+<div class="empty"><strong>No graph yet.</strong>Run <span class="mono">docker compose exec web python manage.py build_graph --extract</span>, or upload a document.</div>
 {% endif %}
-{% if error %}<ul class="messages"><li class="error">{{ error }}</li></ul>{% endif %}
+{% include "_error.html" with error=error %}
 
-<form class="card" method="get">
+<form class="card filters" method="get">
+  <span class="muted small">Show types</span>
   {% for kind in types %}
-  <label><input type="checkbox" name="type" value="{{ kind }}" {% if kind in selected %}checked{% endif %}> {{ kind }}</label>
+  <label style="flex-direction:row; align-items:center; color:var(--fg)"><input type="checkbox" name="type" value="{{ kind }}" {% if kind in selected %}checked{% endif %}> {{ kind }}</label>
   {% endfor %}
-  <button type="submit">Filter</button>
+  <button type="submit" class="btn-secondary">Filter</button>
   {% if selected %}<a href="{% url 'kg:index' %}">all types</a>{% endif %}
 </form>
 
-<div style="display:grid; grid-template-columns: 2fr 1fr; gap:16px;">
-  <iframe id="kg-frame" src="{% url 'kg:graph' %}{% if type_query %}?{{ type_query }}{% endif %}" style="width:100%; height:640px; border:1px solid var(--line); border-radius:8px; background:#fff;"></iframe>
-  <div id="node-panel" class="card" style="max-height:640px; overflow:auto;"><p class="muted">Click a node.</p></div>
+<div class="grid-main-side">
+  <iframe id="kg-frame" title="Knowledge graph" src="{% url 'kg:graph' %}{% if type_query %}?{{ type_query }}{% endif %}" style="width:100%; height:640px; border:1px solid var(--line); border-radius:8px; background:#fff;"></iframe>
+  <div id="node-panel" class="card" style="max-height:640px; overflow:auto;"><p class="panel-empty">Click a node to see its relations and source chunks.</p></div>
 </div>
 
 <h2>GraphRAG</h2>
 {% if latest_eval %}
-<p class="card">Last eval · LLM {{ latest_eval.llm_provider }} / {{ latest_eval.llm_model }} · embeddings {{ latest_eval.embeddings_provider }} / {{ latest_eval.embeddings_model }} · hybrid {{ latest_eval.metrics.hybrid }} · GraphRAG {{ latest_eval.metrics.graphrag }}</p>
+<p class="card small">Last eval · LLM {{ latest_eval.llm_provider }} / {{ latest_eval.llm_model }} · embeddings {{ latest_eval.embeddings_provider }} / {{ latest_eval.embeddings_model }} · hybrid {{ latest_eval.metrics.hybrid }} · GraphRAG {{ latest_eval.metrics.graphrag }}</p>
 {% endif %}
 <form class="card" method="post">
   {% csrf_token %}
-  <input type="text" name="question" value="{{ result.question|default:'' }}" size="80" placeholder="Which tasks are governed by AD 2023-14-09 for part 65-45210-3?" required>
-  <button type="submit">Ask</button>
+  <div class="toolbar">
+    <input class="wide" type="text" name="question" value="{{ result.question|default:'' }}" placeholder="Which tasks are governed by AD 2023-14-09 for part 65-45210-3?" aria-label="GraphRAG question" required>
+    <button type="submit" data-busy="Asking…"><span class="spinner" aria-hidden="true"></span><span class="label">Ask</span></button>
+  </div>
 </form>
 
 {% if result %}
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+<div class="grid-2">
   <div class="card">
-    <span class="badge {% if result.known %}done{% else %}failed{% endif %}">GraphRAG</span>
+    <span class="badge {% if result.known %}done{% else %}pending{% endif %}">GraphRAG</span>
     <p>{{ result.answer }}</p>
     {% for citation in result.citations %}<span class="tag">{{ citation }}</span>{% endfor %}
   </div>
   <div class="card">
-    <span class="badge {% if plain.known %}done{% else %}failed{% endif %}">Hybrid only</span>
+    <span class="badge {% if plain.known %}done{% else %}pending{% endif %}">Hybrid only</span>
     <p>{{ plain.answer }}</p>
     {% for citation in plain.citations %}<span class="tag">{{ citation }}</span>{% endfor %}
   </div>
@@ -58,6 +63,7 @@
 <p class="muted">Matched entities:
   {% for seed in result.seeds %}<span class="tag">{{ seed.name }} · {{ seed.type }} · {{ seed.reason }}</span>{% empty %}none{% endfor %}
 </p>
+<div class="table-wrap">
 <table>
   <thead><tr><th>Hop</th><th>Fact</th><th>Used</th><th>Source</th></tr></thead>
   <tbody>
@@ -73,6 +79,7 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 
 <script>

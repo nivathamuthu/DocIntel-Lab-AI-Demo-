@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Code run #{{ run.id }} · DocIntel Lab{% endblock %}
+{% block page_head %}
+<a class="back" href="{% url 'codegen:index' %}">← All code runs</a>
+<h1>Code run #{{ run.id }}{% if run.function_name %} · <span class="mono">{{ run.function_name }}</span>{% endif %}</h1>
+<p class="lead">Rules {{ run.rule_keys|join:", " }} turned into one function and a pytest file, with every test attempt below.</p>
+{% endblock %}
+{% block next_step %}{% if run.active %}Wait for the attempts to finish; this page updates itself.{% elif run.status == "passed" %}Read the code next to the tests, then copy or download the files.{% else %}Open the last attempt to see which test failed and why, then review the rule or run again.{% endif %}{% endblock %}
+{% block content %}
+{% include "codegen/_run_body.html" %}
+<script>
+function copyCode(id, button) {
+  var text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(function () {
+    var label = button.querySelector(".label");
+    var old = label.textContent;
+    label.textContent = "Copied";
+    setTimeout(function () { label.textContent = old; }, 1500);
+  });
+}
+</script>
+{% endblock %}

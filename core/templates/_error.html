@@ -1,0 +1,1 @@
+{% load ui %}{% if error %}<div class="error-box" role="alert">{{ error|plain_error }}<details><summary>Technical details</summary><span class="mono">{{ error|truncatechars:600 }}</span></details></div>{% endif %}

@@ -1,40 +1,46 @@
 {% extends "base.html" %}
 {% block title %}Rules · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Business rules</h1>
+<p class="lead">IF/THEN rules found in the documents. A rule is kept only when its quote is really in the source text. Near-duplicates are merged, and a judge flags rules that contradict each other.</p>
+{% endblock %}
+{% block next_step %}{% if rules %}Open a rule to read its source and approve or reject it. Approved rules feed <a href="{% url 'codegen:index' %}">Code</a> and the <a href="{% url 'agents:index' %}">Agent</a>.{% else %}Click "Extract rules" to read every chunk for rules.{% endif %}{% endblock %}
 {% block content %}
-<h1>5 · Business rules</h1>
-<p class="muted">Rules are extracted per chunk with prompt <span class="mono">extract_rules/{{ prompt_version }}</span>. A rule whose source quote is not in its chunk is dropped. Near-duplicates are merged, and an LLM judge checks candidate pairs for contradictions.</p>
-
 {% if llm.provider == "mock" %}
-<ul class="messages"><li class="warning">LLM_PROVIDER=mock. These rules and conflict verdicts come from the offline stand-in, not a model. Set LLM_PROVIDER=anthropic or openai for real extraction.</li></ul>
+<ul class="messages"><li class="warning">LLM_PROVIDER=mock. These rules and conflict verdicts come from the offline stand-in, not a model. Set a real provider (for example LLM_PROVIDER=google) for real extraction.</li></ul>
 {% endif %}
-<p class="card">LLM <strong>{{ llm.provider }}</strong> / <span class="mono">{{ llm.model }}</span> · embeddings <strong>{{ embeddings.provider }}</strong> / <span class="mono">{{ embeddings.model }}</span>
+<p class="card small">LLM <strong>{{ llm.provider }}</strong> / <span class="mono">{{ llm.model }}</span> · embeddings <strong>{{ embeddings.provider }}</strong> / <span class="mono">{{ embeddings.model }}</span> · prompt <span class="mono">extract_rules/{{ prompt_version }}</span>
 {% if run %}<br><span class="muted">Last run {{ run.created_at }} · prompt {{ run.prompt_version }} · LLM {{ run.llm_provider }} / {{ run.llm_model }} · {{ run.stats.extraction.ran }} chunks sent to the model, {{ run.stats.extraction.skipped }} cached{% if run.stats.extraction.failed %}, {{ run.stats.extraction.failed }} failed validation{% endif %}</span>{% endif %}</p>
 
-<div class="card">
-  <strong>{{ counts.extracted }}</strong> rules extracted ·
-  <strong>{{ counts.dropped }}</strong> dropped (quote not found) ·
-  <strong>{{ counts.merged }}</strong> merged ·
-  <strong>{{ counts.conflicts }}</strong> conflicts ·
-  <strong>{{ counts.approved }}</strong> approved
-  <span class="muted">· {{ counts.pending }} pending · {{ counts.rejected }} rejected · {{ counts.retired }} retired</span>
-  <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
-    <form method="post" action="{% url 'rules:extract' %}" style="display:inline">
-      {% csrf_token %}
-      <button type="submit">Extract rules</button>
-      <label class="muted"><input type="checkbox" name="force" value="1"> re-run unchanged chunks</label>
-    </form>
-    <a class="btn" href="{% url 'rules:export' 'json' %}">Export approved · JSON</a>
-    <a class="btn" href="{% url 'rules:export' 'csv' %}">Export approved · CSV</a>
+<div class="stats">
+  <div class="stat"><div class="value">{{ counts.extracted }}</div><div class="label">rules extracted</div></div>
+  <div class="stat bad"><div class="value">{{ counts.dropped }}</div><div class="label">dropped (quote not found)</div></div>
+  <div class="stat"><div class="value">{{ counts.merged }}</div><div class="label">merged</div></div>
+  <div class="stat warn"><div class="value">{{ counts.conflicts }}</div><div class="label">conflicts</div></div>
+  <div class="stat ok"><div class="value">{{ counts.approved }}</div><div class="label">approved</div></div>
+</div>
+<p class="muted small">{{ counts.pending }} pending · {{ counts.rejected }} rejected · {{ counts.retired }} retired</p>
+
+<div class="card toolbar spread">
+  <form method="post" action="{% url 'rules:extract' %}" class="toolbar">
+    {% csrf_token %}
+    <button type="submit" data-busy="Extracting…"><span class="spinner" aria-hidden="true"></span><span class="label">Extract rules</span></button>
+    <label class="muted"><input type="checkbox" name="force" value="1"> re-run unchanged chunks</label>
+  </form>
+  <div class="toolbar">
+    <a class="btn btn-secondary" href="{% url 'rules:export' 'json' %}">Export approved · JSON</a>
+    <a class="btn btn-secondary" href="{% url 'rules:export' 'csv' %}">Export approved · CSV</a>
   </div>
 </div>
 
 {% if latest_eval %}
-<p class="card">Last eval · LLM {{ latest_eval.llm_provider }} / {{ latest_eval.llm_model }}
+<p class="card small">Last eval · LLM {{ latest_eval.llm_provider }} / {{ latest_eval.llm_model }}
 {% for version, row in latest_eval.metrics.items %} · {{ version }} precision {{ row.precision }}, recall {{ row.recall }}{% endfor %}</p>
 {% endif %}
 
 {% if conflicts %}
 <h2>Conflicts</h2>
+<div class="table-wrap">
 <table>
   <thead><tr><th>Label</th><th>Rules</th><th>Kind</th><th>Reason</th><th>Judge</th></tr></thead>
   <tbody>
@@ -49,25 +55,36 @@
   {% endfor %}
   </tbody>
 </table>
-{% if has_possible_conflict %}<p class="muted">A C-check deferral against a hard replacement limit is labeled possible conflict (medium). Two different hard limits stay high. The stored judge verdict is unchanged.</p>{% endif %}
+</div>
+{% if has_possible_conflict %}<p class="muted small">A C-check deferral against a hard replacement limit is labeled possible conflict (medium). Two different hard limits stay high. The stored judge verdict is unchanged.</p>{% endif %}
 {% endif %}
 
 <h2>Rules</h2>
-<form class="card" method="get">
+<form class="card filters" method="get">
   <label>Status
     <select name="status">{% for choice in status_choices %}<option value="{{ choice }}" {% if choice == status %}selected{% endif %}>{{ choice }}</option>{% endfor %}</select>
   </label>
   <label>Document
     <select name="document"><option value="">all</option>{% for document in documents %}<option value="{{ document.id }}" {% if document_id == document.id|stringformat:"s" %}selected{% endif %}>{{ document.title }}</option>{% endfor %}</select>
   </label>
-  <label>Min confidence <input type="number" name="min_confidence" step="0.05" min="0" max="1" value="{{ min_confidence }}" style="width:5em"></label>
-  <button type="submit">Filter</button>
+  <label>Min confidence <input type="number" name="min_confidence" step="0.05" min="0" max="1" value="{{ min_confidence }}" style="width:6em"></label>
+  <button type="submit" class="btn-secondary">Filter</button>
 </form>
+{% if rules %}
+<form method="post" action="{% url 'rules:bulk_approve' %}">
+{% csrf_token %}
+<div class="card toolbar">
+  <button type="submit" name="mode" value="selected" class="btn-secondary" onclick="return confirm('Approve the ticked pending rules? Approval should be your own judgement after reading each rule against its source.')">Approve selected</button>
+  <button type="submit" name="mode" value="threshold" class="btn-secondary" {% if not bulk_eligible %}disabled{% endif %} onclick="return confirm('Approve all {{ bulk_eligible }} pending rules with confidence above {{ bulk_min }}? Confidence is the model\'s own score, not a review.')">Approve all {{ bulk_eligible }} pending rules above {{ bulk_min }} confidence</button>
+  <span class="muted small">Approval should be a human judgement: read the rule against its source first. Only pending rules change.</span>
+</div>
+<div class="table-wrap">
 <table>
-  <thead><tr><th>Key</th><th>Condition</th><th>Action</th><th>Exception</th><th>Source</th><th>Conf.</th><th>Status</th></tr></thead>
+  <thead><tr><th><span class="sr-only">Select</span></th><th>Key</th><th>Condition</th><th>Action</th><th>Exception</th><th>Source</th><th>Conf.</th><th>Status</th></tr></thead>
   <tbody>
   {% for rule in rules %}
     <tr>
+      <td>{% if rule.status == "pending" %}<input type="checkbox" name="rule" value="{{ rule.key }}" aria-label="Select {{ rule.key }}">{% endif %}</td>
       <td class="mono"><a href="{% url 'rules:detail' rule.key %}">{{ rule.key }}</a>
         {% if rule.conflict_label %}<br><span class="badge {% if rule.conflict_label == 'conflict' %}failed{% else %}running{% endif %}">{{ rule.conflict_label }}</span>{% endif %}</td>
       <td>{{ rule.condition }}</td>
@@ -75,18 +92,22 @@
       <td>{{ rule.exception|default:"" }}</td>
       <td><span class="tag">{{ rule.document.title }}{% if rule.page %}, p.{{ rule.page }}{% endif %}</span></td>
       <td class="mono">{{ rule.confidence|floatformat:2 }}</td>
-      <td><span class="badge {% if rule.status == 'approved' %}done{% elif rule.status == 'rejected' %}failed{% else %}pending{% endif %}">{{ rule.status }}</span>
+      <td><span class="badge {{ rule.status }}">{{ rule.status }}</span>
         {% if rule.merged_into %}<br><span class="muted">into <a href="{% url 'rules:detail' rule.merged_into.key %}">{{ rule.merged_into.key }}</a></span>{% endif %}
         {% if rule.edited %}<br><span class="tag">edited</span>{% endif %}</td>
     </tr>
-  {% empty %}
-    <tr><td colspan="7" class="muted">No rules match. Click "Extract rules", or run <span class="mono">.\make.ps1 extract-rules</span>.</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
+</form>
+{% else %}
+<div class="empty"><strong>No rules match.</strong>Click "Extract rules", change the filters, or run <span class="mono">.\make.ps1 extract-rules</span>.</div>
+{% endif %}
 
 {% if run.merge_log %}
 <h2>Merge log (last run)</h2>
+<div class="table-wrap">
 <table>
   <thead><tr><th>Rule</th><th>Merged into</th><th>Reason</th><th>Documents</th></tr></thead>
   <tbody>
@@ -95,5 +116,6 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% endblock %}

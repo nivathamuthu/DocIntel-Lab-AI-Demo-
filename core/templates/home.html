@@ -1,21 +1,27 @@
 {% extends "base.html" %}
 {% block title %}DocIntel Lab{% endblock %}
-{% block content %}
+{% block page_head %}
 <h1>DocIntel Lab</h1>
-<p class="muted">Aviation maintenance documents. Modules 1, 2, 3, 4, 5 and 8 are ready to record.</p>
-<p class="card">LLM <strong>{{ llm.provider }}</strong> / <span class="mono">{{ llm.model }}</span>
+<p class="lead">Document AI for aviation maintenance documents. Each module below works on the same ingested documents.</p>
+{% endblock %}
+{% block next_step %}Start with <a href="{% url 'ingest:index' %}">Ingest</a> to see the documents and chunks, then follow the modules in order.{% endblock %}
+{% block content %}
+<div class="card">LLM <strong>{{ llm.provider }}</strong> / <span class="mono">{{ llm.model }}</span>
   · embeddings <strong>{{ embeddings.provider }}</strong> / <span class="mono">{{ embeddings.model }}</span>
-  · <a href="{% url 'results' %}">Results</a></p>
+  · <a href="{% url 'results' %}">Latest eval results</a></div>
+<div class="table-wrap">
 <table>
-  <thead><tr><th></th><th>Module</th><th>What to open</th></tr></thead>
+  <thead><tr><th>#</th><th>Module</th><th>What it does</th></tr></thead>
   <tbody>
   {% for module in modules %}
     <tr>
       <td class="mono">{{ module.n }}</td>
-      <td>{% if module.planned %}<span class="muted">{{ module.name }}</span> <span class="badge pending">planned</span>{% else %}<a href="{% url module.url %}">{{ module.name }}</a>{% endif %}</td>
+      <td>{% if module.planned %}<span class="muted">{{ module.name }}</span> <span class="badge pending">planned</span>{% else %}<a href="{% url module.url %}"><strong>{{ module.name }}</strong></a>{% endif %}</td>
       <td>{{ module.line }}</td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
+<p class="muted small">Known limitations: demo build, no authentication on any page. See the README for the full list.</p>
 {% endblock %}

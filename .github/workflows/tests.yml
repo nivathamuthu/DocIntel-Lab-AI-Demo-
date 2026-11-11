@@ -1,0 +1,48 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: docintel
+          POSTGRES_USER: docintel
+          POSTGRES_PASSWORD: docintel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U docintel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Offline suite: mock LLM and embeddings, NetworkX graph, Celery in-process. No API keys.
+    env:
+      DATABASE_URL: postgres://docintel:docintel@localhost:5432/docintel
+      LLM_PROVIDER: mock
+      EMBEDDINGS_PROVIDER: mock
+      GRAPH_BACKEND: networkx
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      LLM_VALIDATE_ON_STARTUP: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements/*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
+      - name: Run tests
+        run: pytest

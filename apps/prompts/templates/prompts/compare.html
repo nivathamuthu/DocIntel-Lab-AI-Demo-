@@ -1,15 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Prompts · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Prompts</h1>
+<p class="lead">The same ten samples through a one-line prompt (v1) and an engineered prompt (v2) that names the role, the rules, the schema and examples, and says "unknown" when the chunk has no answer.</p>
+{% endblock %}
+{% block next_step %}{% if run %}Compare a v1 row with its v2 row, then open <a href="{% url 'rag:query' %}">Search</a>, which uses the v2 prompt.{% else %}Run <span class="mono">docker compose exec web python manage.py eval_prompts</span>, then reload this page.{% endif %}{% endblock %}
 {% block content %}
-<h1>2 · Prompts</h1>
-<p class="muted">v1 is a one-line prompt. v2 names the role, the rules, the schema and two examples, and it must say unknown when the chunk does not contain the answer. Run <span class="mono">python manage.py eval_prompts</span>.</p>
 {% if not run %}
-<p class="card">No eval yet.</p>
+<div class="empty"><strong>No eval yet.</strong>Run <span class="mono">docker compose exec web python manage.py eval_prompts</span> to score v1 against v2.</div>
 {% else %}
-<div class="card">
-  <strong>v1 {{ run.metrics.v1 }}</strong> · <strong>v2 {{ run.metrics.v2 }}</strong>
-  <div class="muted">LLM {{ run.llm_provider }} / {{ run.llm_model }} · embeddings {{ run.embeddings_provider }} / {{ run.embeddings_model }} · {{ run.created_at }}</div>
+<div class="stats">
+  <div class="stat"><div class="value">{{ run.metrics.v1 }}</div><div class="label">v1 mean score</div></div>
+  <div class="stat ok"><div class="value">{{ run.metrics.v2 }}</div><div class="label">v2 mean score</div></div>
 </div>
+<p class="muted small">LLM {{ run.llm_provider }} / {{ run.llm_model }} · embeddings {{ run.embeddings_provider }} / {{ run.embeddings_model }} · {{ run.created_at }}</p>
+<div class="table-wrap">
 <table>
   <thead>
     <tr><th>Sample</th><th>v1</th><th>v2</th></tr>
@@ -30,5 +35,6 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% endblock %}

@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ document.title }} · Ingest{% endblock %}
+{% block page_head %}
+<a class="back" href="{% url 'ingest:index' %}">← All documents</a>
+<h1>{{ document.title }}</h1>
+<p class="lead">Each pipeline stage with its status, attempts and time, then the chunks with their page, section and identifiers.</p>
+{% endblock %}
+{% block next_step %}Read a chunk below, then ask about it in <a href="{% url 'rag:query' %}">Search</a>.{% endblock %}
 {% block content %}
-<p class="muted"><a href="{% url 'ingest:index' %}">← All documents</a></p>
 {% include "ingest/_detail.html" %}
 {% endblock %}

@@ -236,6 +236,23 @@ def test_review_and_export(client, corpus):
     assert rows[0]["condition"] == "A missing non-essential placard"
 
 
+def test_bulk_approve_selected_and_above_threshold(client, corpus):
+    run_rules()
+    pending = list(Rule.objects.filter(status=Rule.Status.PENDING).order_by("key"))
+    page = client.get(reverse("rules:index")).content.decode()
+    assert "Approve selected" in page and "confidence" in page and "human judgement" in page
+    rejected = pending[-1]
+    Rule.objects.filter(pk=rejected.pk).update(status=Rule.Status.REJECTED)
+    client.post(reverse("rules:bulk_approve"), {"mode": "selected", "rule": [pending[0].key, rejected.key]})
+    assert Rule.objects.get(pk=pending[0].pk).status == Rule.Status.APPROVED
+    assert Rule.objects.get(pk=rejected.pk).status == Rule.Status.REJECTED
+    Rule.objects.filter(pk=pending[1].pk).update(confidence=0.5)
+    Rule.objects.filter(pk=pending[2].pk).update(confidence=0.95)
+    client.post(reverse("rules:bulk_approve"), {"mode": "threshold"})
+    assert Rule.objects.get(pk=pending[1].pk).status == Rule.Status.PENDING
+    assert Rule.objects.get(pk=pending[2].pk).status == Rule.Status.APPROVED
+
+
 def test_pages_show_provider_counts_and_highlight(client, corpus):
     run_rules()
     page = client.get(reverse("rules:index")).content.decode()

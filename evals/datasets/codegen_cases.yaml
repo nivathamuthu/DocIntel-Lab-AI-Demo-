@@ -1,0 +1,23 @@
+# Rules for eval_codegen. Each rule is found by a phrase in its condition, action or exception,
+# so a re-extraction that renumbers the keys still finds it. Six rules in five runs.
+- name: exception
+  why: A deferral rule with an exception (not when the AD is already open on the same gear).
+  rules:
+    - "may be deferred for 50 flight hours"
+- name: numeric_threshold
+  why: A single numeric threshold (start planning at 11000 flight hours).
+  rules:
+    - "flight hours reach 11000"
+- name: conflicting_pair
+  why: Two rules give different replacement thresholds for the same part (12000 vs 11500).
+  rules:
+    - "flight hours are at least 12000"
+    - "replace it at 11500 flight hours"
+- name: mel_placard
+  why: A non-numeric permission (a missing non-essential placard may be deferred under the MEL).
+  rules:
+    - "placard is missing"
+- name: c_check_inspection
+  why: A recurring task with no number in it (detailed visual inspection at every C-check).
+  rules:
+    - "every C-check"

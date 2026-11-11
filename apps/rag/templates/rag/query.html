@@ -1,28 +1,33 @@
 {% extends "base.html" %}
-{% block title %}RAG · DocIntel Lab{% endblock %}
+{% block title %}Search · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Search</h1>
+<p class="lead">Ask a question and get an answer with the document, page and section it came from. Choose how the chunks are found: by meaning (vector), by exact words (BM25), or both combined.</p>
+{% endblock %}
+{% block next_step %}{% if result %}Switch the retrieval mode and ask again to compare, or open <a href="{% url 'kg:index' %}">Graph</a> for questions that need two facts.{% else %}Type a part number or directive, for example "Which part replaces 65-45210-3?", and click Ask.{% endif %}{% endblock %}
 {% block content %}
-<h1>3 · Hybrid retrieval</h1>
-<p class="muted">BM25 and pgvector, merged with reciprocal rank fusion. Hybrid+rerank uses a lexical rerank unless <span class="mono">RERANK_ENABLED=true</span> and the image was built with the ML extra.</p>
 {% if latest_eval %}
-<p class="card">Last hit@5 · LLM {{ latest_eval.llm_provider }} / {{ latest_eval.llm_model }} · embeddings {{ latest_eval.embeddings_provider }} / {{ latest_eval.embeddings_model }}
+<p class="card small">Last hit@5 · LLM {{ latest_eval.llm_provider }} / {{ latest_eval.llm_model }} · embeddings {{ latest_eval.embeddings_provider }} / {{ latest_eval.embeddings_model }}
   {% for name, score in latest_eval.metrics.hit_at_k.items %} · {{ name }} {{ score }}{% endfor %}
 </p>
 {% endif %}
 <form class="card" method="post">
   {% csrf_token %}
-  <p>
-    <input type="text" name="question" value="{{ result.question|default:'' }}" placeholder="Ask about a part number or an AD" size="70" required>
-    <button type="submit">Ask</button>
-  </p>
-  <p>
+  <div class="toolbar">
+    <input class="wide" type="text" name="question" value="{{ result.question|default:'' }}" placeholder="Ask about a part number or an AD" aria-label="Question" required>
+    <button type="submit" data-busy="Searching…"><span class="spinner" aria-hidden="true"></span><span class="label">Ask</span></button>
+  </div>
+  <fieldset class="toolbar" style="border:0; padding:0; margin:10px 0 0;">
+    <legend class="muted small" style="padding:0; margin-bottom:4px;">Retrieval mode</legend>
     {% for item in modes %}
     <label><input type="radio" name="mode" value="{{ item }}" {% if item == mode %}checked{% endif %}> {{ item }}</label>
     {% endfor %}
-  </p>
+  </fieldset>
+  <p class="muted small" style="margin-top:8px">Hybrid+rerank uses a lexical rerank unless <span class="mono">RERANK_ENABLED=true</span> and the image was built with the ML extra.</p>
 </form>
 {% if result %}
 <div class="card">
-  <span class="badge {% if result.known %}done{% else %}failed{% endif %}">{% if result.known %}answered{% else %}abstained{% endif %}</span>
+  <span class="badge {% if result.known %}done{% else %}pending{% endif %}">{% if result.known %}answered{% else %}abstained{% endif %}</span>
   <span class="muted">{{ result.mode }}</span>
   <p>{{ result.answer }}</p>
   {% if result.citations %}
@@ -30,6 +35,8 @@
   {% endif %}
 </div>
 <h2>Retrieved chunks</h2>
+{% if result.hits %}
+<div class="table-wrap">
 <table>
   <thead><tr><th>Score</th><th>Source</th><th>Text</th></tr></thead>
   <tbody>
@@ -39,10 +46,12 @@
       <td>{{ hit.document }}{% if hit.page %}, p.{{ hit.page }}{% endif %}{% if hit.section %}<div class="muted">{{ hit.section }}</div>{% endif %}</td>
       <td><pre class="chunk">{{ hit.text }}</pre></td>
     </tr>
-    {% empty %}
-    <tr><td colspan="3" class="muted">Nothing retrieved.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
+{% else %}
+<div class="empty"><strong>Nothing retrieved.</strong>Try another mode or more specific words.</div>
+{% endif %}
 {% endif %}
 {% endblock %}

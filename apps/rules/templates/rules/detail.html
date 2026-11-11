@@ -1,15 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ rule.key }} · Rules · DocIntel Lab{% endblock %}
-{% block content %}
-<p><a href="{% url 'rules:index' %}">← all rules</a></p>
-<h1>{{ rule.key }} <span class="badge {% if rule.status == 'approved' %}done{% elif rule.status == 'rejected' %}failed{% else %}pending{% endif %}">{{ rule.status }}</span>
+{% block page_head %}
+<a class="back" href="{% url 'rules:index' %}">← All rules</a>
+<h1>{{ rule.key }} <span class="badge {{ rule.status }}">{{ rule.status }}</span>
   {% if conflicts %}<span class="badge failed">{{ conflicts|length }} conflict{{ conflicts|length|pluralize }}</span>{% endif %}</h1>
-<p class="muted">{{ rule.citation }} · confidence {{ rule.confidence|floatformat:2 }} · prompt {{ rule.prompt_version }} · extracted by {{ rule.llm_provider }} / <span class="mono">{{ rule.llm_model }}</span></p>
+<p class="lead">{{ rule.citation }} · confidence {{ rule.confidence|floatformat:2 }} · prompt {{ rule.prompt_version }} · extracted by {{ rule.llm_provider }} / <span class="mono">{{ rule.llm_model }}</span></p>
+{% endblock %}
+{% block next_step %}Check the highlighted quote in the source chunk, then approve, reject or edit the rule below.{% endblock %}
+{% block content %}
 {% if rule.llm_provider == "mock" %}<ul class="messages"><li class="warning">Extracted by the offline mock, not a model.</li></ul>{% endif %}
 
 <div class="card">
   <table>
-    <tr><th style="width:110px">Condition</th><td>{{ rule.condition }}</td></tr>
+    <tr><th style="width:130px">Condition</th><td>{{ rule.condition }}</td></tr>
     <tr><th>Action</th><td>{{ rule.action }}</td></tr>
     <tr><th>Exception</th><td>{{ rule.exception|default:"none" }}</td></tr>
     {% if rule.edited %}<tr><th>Original</th><td class="muted">IF {{ rule.original.condition }} THEN {{ rule.original.action }}{% if rule.original.exception %} · exception {{ rule.original.exception }}{% endif %}</td></tr>{% endif %}
@@ -27,6 +30,7 @@
 
 {% if conflicts %}
 <h2>Conflicts</h2>
+<div class="table-wrap">
 <table>
   <thead><tr><th>Other rule</th><th>Severity</th><th>Reason</th></tr></thead>
   <tbody>
@@ -39,6 +43,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 
 {% if duplicates %}
@@ -47,12 +52,12 @@
 {% endif %}
 
 <h2>Review</h2>
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+<div class="grid-2">
   <form class="card" method="post" action="{% url 'rules:review' rule.key %}">
     {% csrf_token %}
     <label>Reviewer note<br><textarea name="note" rows="3" style="width:100%">{{ rule.reviewer_note }}</textarea></label>
-    <p><button type="submit" name="action" value="approve">Approve</button>
-       <button type="submit" name="action" value="reject" style="background:var(--bad)">Reject</button></p>
+    <p class="toolbar"><button type="submit" name="action" value="approve" class="btn-ok">Approve</button>
+       <button type="submit" name="action" value="reject" class="btn-danger">Reject</button></p>
   </form>
   <form class="card" method="post" action="{% url 'rules:review' rule.key %}">
     {% csrf_token %}
@@ -61,7 +66,7 @@
     <label>Action<br><textarea name="action_text" rows="2" style="width:100%" required>{{ rule.action }}</textarea></label>
     <label>Exception<br><textarea name="exception" rows="2" style="width:100%">{{ rule.exception }}</textarea></label>
     <label>Note<br><input type="text" name="note" style="width:100%"></label>
-    <p><button type="submit">Save edit</button></p>
+    <p><button type="submit" class="btn-secondary">Save edit</button></p>
   </form>
 </div>
 {% endblock %}

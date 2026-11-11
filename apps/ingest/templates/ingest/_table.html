@@ -1,8 +1,10 @@
 <div id="doc-table" {% if active %}hx-get="{% url 'ingest:index' %}" hx-trigger="every 2s" hx-select="#doc-table" hx-swap="outerHTML"{% endif %}>
+  {% if documents %}
+  <div class="table-wrap">
   <table>
     <thead>
       <tr>
-        <th>Document</th><th>Type</th><th>Status</th><th>Stage</th><th>Chunks</th><th>Pages</th><th></th>
+        <th>Document</th><th>Type</th><th>Status</th><th>Stage</th><th>Chunks</th><th>Pages</th><th>Added</th>
       </tr>
     </thead>
     <tbody>
@@ -23,9 +25,11 @@
         <td>{{ document.page_count|default:"—" }}</td>
         <td class="muted">{{ document.created_at|date:"H:i:s" }}</td>
       </tr>
-      {% empty %}
-      <tr><td colspan="7" class="muted">Nothing ingested yet. Upload a file, or run <span class="mono">.\make.ps1 demo</span>.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  {% else %}
+  <div class="empty"><strong>Nothing ingested yet.</strong>Upload a file above, or run <span class="mono">.\make.ps1 demo-reset</span> to load the demo corpus.</div>
+  {% endif %}
 </div>

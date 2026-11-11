@@ -14,5 +14,7 @@ urlpatterns = [
     path("rag/", include("apps.rag.urls")),
     path("kg/", include("apps.kg.urls")),
     path("rules/", include("apps.rules.urls")),
+    path("qa/", include("apps.qa_gen.urls")),
+    path("codegen/", include("apps.codegen.urls")),
     path("agents/", include("apps.agents.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

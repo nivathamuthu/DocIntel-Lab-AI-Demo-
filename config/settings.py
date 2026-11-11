@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     "apps.rag",
     "apps.kg",
     "apps.rules",
+    "apps.qa_gen",
+    "apps.codegen",
     "apps.agents",
 ]
 
@@ -74,6 +76,7 @@ STATIC_URL = "static/"
 MEDIA_URL = "media/"
 MEDIA_ROOT = Path(env("MEDIA_ROOT", default=str(BASE_DIR / "data" / "media")))
 CORPUS_DIR = BASE_DIR / "data" / "corpus"
+EVAL_RESULTS_DIR = BASE_DIR / "evals" / "results"
 DATA_UPLOAD_MAX_MEMORY_SIZE = 80 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 80 * 1024 * 1024
 
@@ -127,6 +130,21 @@ RULES_PROMPT_VERSION = env("RULES_PROMPT_VERSION", default="v2")
 RULES_MERGE_SIMILARITY = env.float("RULES_MERGE_SIMILARITY", default=0.9)
 # Conflict candidates: rules sharing an identifier, or conditions at or above this cosine.
 RULES_CONFLICT_SIMILARITY = env.float("RULES_CONFLICT_SIMILARITY", default=0.6)
+
+# --- Q&A generation (Module 6) -------------------------------------------------------
+QA_PROMPT_VERSION = env("QA_PROMPT_VERSION", default="v2")
+QA_JUDGE_PROMPT_VERSION = env("QA_JUDGE_PROMPT_VERSION", default="v2")
+# Pairs scored below this by the groundedness judge are dropped.
+QA_MIN_GROUNDEDNESS = env.float("QA_MIN_GROUNDEDNESS", default=0.8)
+# Chunk pairs linked through a shared graph entity, used for multi-hop questions.
+QA_MAX_PAIRS = env.int("QA_MAX_PAIRS", default=8)
+# The Search evaluation samples at most this many kept pairs per question type.
+QA_EVAL_MAX_PER_TYPE = env.int("QA_EVAL_MAX_PER_TYPE", default=8)
+QA_EVAL_MODES = env.list("QA_EVAL_MODES", default=["vector", "bm25", "hybrid_rerank"])
+
+# --- Rules to code (Module 7) ---------------------------------------------------------
+CODEGEN_MAX_ATTEMPTS = env.int("CODEGEN_MAX_ATTEMPTS", default=3)
+CODEGEN_TEST_TIMEOUT_SECONDS = env.int("CODEGEN_TEST_TIMEOUT_SECONDS", default=30)
 
 # --- Compliance agent ---------------------------------------------------------------
 # hybrid_rerank tied bm25 for the best hit@1 and MRR on the real eval_rag run (hit@5 was 1.0 for every mode).

@@ -22,5 +22,5 @@ class RuleOutput(BaseModel):
 
 SCHEMAS = {
     "answer_with_citations": AnswerOutput,
-    "extract_rule": RuleOutput,
+    "extract_single_rule": RuleOutput,
 }

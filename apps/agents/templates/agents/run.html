@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% load rules_display %}
 {% block title %}Agent run {{ run.id }} · DocIntel Lab{% endblock %}
-{% block content %}
-<p><a href="{% url 'agents:index' %}">&larr; Agent</a></p>
+{% block page_head %}
+<a class="back" href="{% url 'agents:index' %}">&larr; Agent</a>
 <h1>Run #{{ run.id }}</h1>
+<p class="lead">Every step the agent took, what it read and wrote, and the answer waiting for your decision.</p>
+{% endblock %}
+{% block next_step %}{% if run.status == "awaiting_approval" %}Read the draft and the citation check, then approve or reject it.{% elif run.active %}Wait for the trace to fill in; it refreshes on its own.{% else %}Open the trace rows below to see each step's input and output, or ask another question.{% endif %}{% endblock %}
+{% block content %}
 {% include "agents/_backend.html" %}
 <div class="card">
   <strong>{{ run.question }}</strong><br>
@@ -25,9 +29,11 @@
   <p class="muted">Sources: {% for s in run.review.sources %}<span class="tag">S{{ s.n }} {{ s.citation }} ({{ s.origin }})</span>{% endfor %}</p>
   <form method="post" action="{% url 'agents:decide' run.id %}">
     {% csrf_token %}
-    <p><textarea name="note" rows="2" cols="90" placeholder="Reviewer note (required to reject)"></textarea></p>
-    <button type="submit" name="decision" value="approve">Approve</button>
-    <button type="submit" name="decision" value="reject" style="background:var(--bad)">Reject</button>
+    <p><textarea name="note" rows="2" style="width:100%" placeholder="Reviewer note (required to reject)" aria-label="Reviewer note"></textarea></p>
+    <div class="toolbar">
+      <button type="submit" name="decision" value="approve" class="btn-ok" data-busy="Resuming…"><span class="spinner" aria-hidden="true"></span><span class="label">Approve</span></button>
+      <button type="submit" name="decision" value="reject" class="btn-danger" data-busy="Resuming…"><span class="spinner" aria-hidden="true"></span><span class="label">Reject</span></button>
+    </div>
   </form>
 </div>
 {% endif %}
@@ -35,7 +41,7 @@
 {% if run.final %}
 <div class="card" style="border-color:{% if run.status == 'done' %}var(--ok){% elif run.status == 'refused' %}var(--line){% else %}var(--bad){% endif %}">
   <h2 style="margin-top:0">Final answer
-    <span class="badge {% if run.status == 'done' %}done{% elif run.status == 'rejected' %}failed{% endif %}">{{ run.get_status_display }}</span></h2>
+    <span class="badge {% if run.status == 'done' %}done{% elif run.status == 'failed' or run.status == 'rejected' %}failed{% elif run.status == 'refused' %}info{% elif run.status == 'awaiting_approval' or run.active %}running{% endif %}">{{ run.get_status_display }}</span></h2>
   {% if run.final.warning %}<ul class="messages"><li class="warning">{{ run.final.warning }}</li></ul>{% endif %}
   {% if run.final.conflicts %}
   <ul class="messages"><li class="error"><strong>Conflict between applicable rules.</strong> The answer does not pick a side:
@@ -59,7 +65,7 @@
 </div>
 {% endif %}
 
-{% if run.error %}<ul class="messages"><li class="error">{{ run.error }}</li></ul>{% endif %}
+{% include "_error.html" with error=run.error %}
 
 <h2>Trace</h2>
 {% include "agents/_trace.html" %}

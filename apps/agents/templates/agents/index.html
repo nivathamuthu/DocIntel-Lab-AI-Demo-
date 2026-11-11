@@ -1,17 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Agent · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Compliance agent</h1>
+<p class="lead">Ask a compliance question. The agent searches the documents, the graph and the rules, drafts an answer with quotes, checks every citation (retrying up to {{ max_loops }} times), and waits for your approval.</p>
+{% endblock %}
+{% block next_step %}Click an example question below, then "Ask the agent" and watch the trace.{% endblock %}
 {% block content %}
-<h1>8 · Compliance assistant</h1>
-<p class="muted">A LangGraph agent: classify, plan, hybrid search, graph lookup, rule check, draft with citations, citation check (it loops back to retrieval up to {{ max_loops }} times), then a human approval before the answer is final.</p>
 {% include "agents/_backend.html" %}
 
 <form class="card" method="post">
   {% csrf_token %}
-  <p><input type="text" name="question" placeholder="Ask a compliance question about the documents" size="95" required></p>
-  <p class="muted">Examples:
+  <div class="toolbar">
+    <input class="wide" type="text" name="question" placeholder="Ask a compliance question about the documents" aria-label="Question" required>
+    <button type="submit" data-busy="Starting…"><span class="spinner" aria-hidden="true"></span><span class="label">Ask the agent</span></button>
+  </div>
+  <p class="muted small">Examples:
     {% for example in examples %}<br><a href="#" onclick="document.querySelector('input[name=question]').value=this.textContent; return false;">{{ example }}</a>{% endfor %}
   </p>
-  <button type="submit">Ask the agent</button>
 </form>
 
 {% if latest_eval %}
@@ -23,6 +28,7 @@
 {% endif %}
 
 <h2>Recent runs</h2>
+<div class="table-wrap">
 <table>
   <thead><tr><th>Run</th><th>Question</th><th>Intent</th><th>Status</th><th>Loops</th><th>Verified</th><th>Model</th></tr></thead>
   <tbody>
@@ -31,14 +37,15 @@
       <td class="mono"><a href="{% url 'agents:run' run.id %}">#{{ run.id }}</a><br><span class="muted">{{ run.source }}</span></td>
       <td>{{ run.question }}</td>
       <td class="mono">{{ run.intent }}</td>
-      <td><span class="badge {% if run.status == 'done' %}done{% elif run.status == 'failed' or run.status == 'rejected' %}failed{% elif run.status == 'awaiting_approval' or run.active %}running{% endif %}">{{ run.get_status_display }}</span></td>
+      <td><span class="badge {% if run.status == 'done' %}done{% elif run.status == 'failed' or run.status == 'rejected' %}failed{% elif run.status == 'refused' %}info{% elif run.status == 'awaiting_approval' or run.active %}running{% endif %}">{{ run.get_status_display }}</span></td>
       <td class="mono">{{ run.loops }}</td>
       <td>{% if run.verified is None %}<span class="muted">-</span>{% elif run.verified %}yes{% else %}<strong>no</strong>{% endif %}</td>
       <td class="mono">{{ run.llm_provider }} / {{ run.llm_model }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="7" class="muted">No runs yet.</td></tr>
+    <tr><td colspan="7" class="muted">No runs yet. Ask a question above.</td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% endblock %}

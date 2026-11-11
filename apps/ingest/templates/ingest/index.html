@@ -1,16 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Ingest · DocIntel Lab{% endblock %}
+{% block page_head %}
+<h1>Ingest</h1>
+<p class="lead">Upload a PDF, DOCX, PPTX or text file. The worker detects, parses, cleans, chunks, enriches, embeds and indexes it. The same file is never stored twice.</p>
+{% endblock %}
+{% block next_step %}Click a document to see its stages and chunks, then open <a href="{% url 'rag:query' %}">Search</a> to ask a question about it.{% endblock %}
 {% block content %}
-<h1>1 · Ingest</h1>
-<p class="muted">Upload a PDF, DOCX, PPTX or text file. The worker runs detect, parse, clean, chunk, enrich, embed and index. The same file hash is not ingested twice.</p>
-
 <form class="card" method="post" enctype="multipart/form-data">
   {% csrf_token %}
-  <p>
-    <input type="file" name="file" accept=".pdf,.docx,.pptx,.txt,.md" required>
-    <input type="text" name="title" placeholder="Title (optional)" maxlength="255">
-    <button type="submit">Upload</button>
-  </p>
+  <div class="toolbar">
+    <label for="upload-file" class="muted">File</label>
+    <input id="upload-file" type="file" name="file" accept=".pdf,.docx,.pptx,.txt,.md" required>
+    <input type="text" name="title" placeholder="Title (optional)" maxlength="255" aria-label="Title">
+    <button type="submit" data-busy="Uploading…"><span class="spinner" aria-hidden="true"></span><span class="label">Upload</span></button>
+  </div>
 </form>
 
 {% include "ingest/_table.html" %}

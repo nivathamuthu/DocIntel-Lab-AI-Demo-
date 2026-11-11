@@ -1,14 +1,24 @@
 """Prompt versions, the mock score gap, and validation retry."""
+from pathlib import Path
+
 import pytest
+from django.conf import settings
 from django.core.management import call_command
 
-from apps.prompts.schemas import AnswerOutput
+from apps.prompts.schemas import SCHEMAS, AnswerOutput
 from apps.prompts.services.eval import run_eval
 from core.llm import Usage, structured_call
 from core.models import EvalRun, LLMCall
 from core.prompts import render_prompt
 
 pytestmark = pytest.mark.django_db
+
+
+def test_every_prompt_task_has_both_versions_on_disk():
+    for task in SCHEMAS:
+        folder = Path(settings.BASE_DIR) / "prompts" / task
+        assert (folder / "v1.md").exists(), task
+        assert (folder / "v2.md").exists(), task
 
 
 def test_v2_template_carries_the_abstain_rule_and_v1_does_not():

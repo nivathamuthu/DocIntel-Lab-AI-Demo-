@@ -1,0 +1,1 @@
+{% load ui %}{% if score is not None %}<span class="meter" title="Groundedness {{ score|floatformat:2 }}"><span class="track"><span class="fill {{ score|meter_class }}" style="width: {% widthratio score 1 100 %}%"></span></span><span class="mono">{{ score|floatformat:2 }}</span></span>{% else %}<span class="muted small">not judged</span>{% endif %}

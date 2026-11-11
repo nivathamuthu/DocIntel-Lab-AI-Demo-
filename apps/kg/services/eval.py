@@ -55,7 +55,7 @@ def run_eval() -> EvalRun:
     embeddings = describe_embeddings()
     build = GraphBuild.objects.first()
     report = _report(rows, metrics, llm, embeddings, build)
-    results_dir = Path(settings.BASE_DIR) / "evals" / "results"
+    results_dir = Path(settings.EVAL_RESULTS_DIR)
     results_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     (results_dir / f"kg_{stamp}.md").write_text(report, encoding="utf-8")
